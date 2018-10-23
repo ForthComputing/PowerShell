@@ -1,0 +1,212 @@
+<#
+    .NOTES
+    --------------------------------------------------------------------------------
+     Created on:       DD/MM/YYYY
+     Created by:       Forth Computing
+     Version:          0.0.0.1
+
+     Description:		Can be used as a template for future scripts. Yes a lot of
+						code before even starting to add own program code but
+						structure is sound.
+     Modifications:    
+
+	 # Run below to collapse or expand all regions
+     # $psISE.CurrentFile.Editor.ToggleOutliningExpansion()
+    --------------------------------------------------------------------------------
+#>
+
+#region - Main Program Try
+#---------------------------------------------------------[Main Program Try]--------------------------------------------------------
+Try # Start of Main Program Try
+{
+	#region - Initialisations
+	#---------------------------------------------------------[Initialisations]--------------------------------------------------------
+	# Add variables here that may need updating and so easy to view and change
+	
+	#Script Version Information
+	$scriptVersion = [version]"0.0.0.1"
+	$strScriptVersion = $scriptVersion.ToString()
+	
+	#Gets script name for use in logging
+	$scriptName = [System.IO.Path]::GetFileNameWithoutExtension($MyInvocation.MyCommand.Definition)
+	
+	#Logging Information
+	$global:LogFilePath = "c:\windows\temp\$scriptName.log" # Log file path, uses scriptname variable above
+	$global:LogFileMaxSize = 1Mb # Set max log size before renaming to scriptName + yyyyMMdd-HHmmss
+	
+	#$ErrorActionPreference = 'SilentlyContinue' # Set Error Action to SilentlyContinue as I want the task sequence to not fail on this script
+	
+	Set-Location $PSScriptRoot # Set directory location to script route
+	
+	#endregion
+	
+	#region - Functions
+	#-----------------------------------------------------------[Functions]------------------------------------------------------------
+	
+	#region - Function: Main
+	Function Main {
+		# Main function that is called. Put all code here for program execution so that easy to follow.
+		
+		Write-Log "*** Function Main Start ***"
+		
+		# Add code here
+		
+		Write-Log "*** Function Main End ***"
+		
+	} # Main: End
+	#endregion
+	
+	#region - Function: Write-Log
+	Function Write-Log
+	{
+		
+		<#
+	    	.NOTES
+		    --------------------------------------------------------------------------------
+			Author:       Forth Computing
+		 
+			Description: Functions and variables to use for logging PowerShell Scripts
+		  
+			References: This has been put together with the help and ideas of the
+			following people/resources.
+		 
+			https://www.adamtheautomator.com/building-logs-for-cmtrace-powershell/
+			http://damgoodadmin.com/2018/04/10/so-you-want-to-write-a-powershell-script/
+		 
+		    --------------------------------------------------------------------------------
+		#>
+		[CmdletBinding()]
+		param (
+			[Parameter(
+					   Mandatory = $true)]
+			[string]$Message,
+			[Parameter()]
+			[ValidateSet(1, 2, 3)]
+			[int]$LogLevel = 1,
+			[int]$LogCount = 0
+		)
+		DO
+		{
+			If (Test-Path $global:LogFilePath)
+			{
+				#Check log size, rename if bigger than pre-set size
+				If ((Get-Item $global:LogFilePath).Length -gt $global:LogFileMaxSize)
+				{
+					Get-Item $global:LogFilePath | Rename-Item -Path $global:LogFilePath -NewName { $_.BaseName + "-" + (Get-Date -Format "yyyyMMdd-HHmmss").ToString() + $_.Extension }
+					continue
+				}
+				$TimeGenerated = "$(Get-Date -Format HH:mm:ss).$((Get-Date).Millisecond)+000"
+				$Line = '<![LOG[{0}]LOG]!><time="{1}" date="{2}" component="{3}" context="" type="{4}" thread="" file="">'
+				$LineFormat = $Message, $TimeGenerated, (Get-Date -Format MM-dd-yyyy), "$($MyInvocation.ScriptName | Split-Path -Leaf):$($MyInvocation.ScriptLineNumber)", $LogLevel
+				$Line = $Line -f $LineFormat
+				If ($LogLevel -eq 1) { Write-Output $Message }
+				else { Write-Warning -Message $Message }
+				Out-File -InputObject $Line -Append -NoClobber -Encoding Default -FilePath $global:LogFilePath -WhatIf:$False
+				$LogCount = 1
+			}
+			else
+			{
+				If ($LogCount -eq 0)
+				{
+					New-Item $global:LogFilePath -Type File | Out-Null
+					If (-not (Test-Path $global:LogFilePath)) { $LogCount = 2 }
+				}
+				ElseIf ($LogCount -eq 2) { Write-Warning "Couldn't create log file: $global:LogFilePath"; Break }
+			}
+		}
+		Until ($LogCount -eq 1)
+	} # Write-Log: End
+	#endregion
+	
+	#region - Function: Write-InitialLogEntry
+	Function Write-InitialLogEntry {
+		Write-Log "=================================================================="
+		Write-Log "  Script Started: `t $currentDate (D/M/Y) $currentTime (local)"
+		Write-Log "  Script name: $scriptName"
+		Write-Log "  Script version: $strScriptVersion"
+		Write-Log "  Script path: $scriptPath"
+		Write-Log "  This log file path: $global:LogFilePath"
+		Write-Log "  Computer name: $envComputerName"
+		Write-Log "  Processor Architecture: $envArchitecture"
+		Write-Log "  Is this a 64bit OS: $is64Bit"
+		Write-Log "  Powershell scripting architecture: $psArchitecture"
+		Write-Log "  Username: $envUserName"
+		Write-Log "  Windows directory: $envWinDir"
+		Write-Log "  Windows Temp directory: $envWinTempDir"
+		Write-Log "  Script Error Preference set as: $ErrorActionPreference"
+		Write-Log " "
+		Write-Log "Main Program start"
+		Write-Log "---------------------------------"
+		Write-Log " "
+	}
+	#endregion
+	
+	#endregion
+	
+	#region - Declarations
+	#----------------------------------------------------------[Declarations]----------------------------------------------------------
+	# Add variables here that don't require changing
+	
+	#region - Variables: Environment
+	$currentDate = (Get-Date -UFormat "%d-%m-%Y")
+	$currentTime = (Get-Date -UFormat "%T")
+	$envArchitecture = $env:PROCESSOR_ARCHITECTURE
+	$envComputerName = $env:COMPUTERNAME
+	$envSystemDrive = $env:SYSTEMDRIVE
+	$envSystemRoot = $env:SYSTEMROOT
+	$envUserName = $env:USERNAME
+	$envWinDir = $env:WINDIR
+	$envWinTempDir = "$envWinDir\Temp"
+	$scriptPath = $MyInvocation.MyCommand.Definition
+	
+	# Variables: Architecture
+	$is64Bit = (Get-WmiObject -Class Win32_OperatingSystem -ea 0).OSArchitecture -eq '64-bit'
+	$is64BitProcess = [System.IntPtr]::Size -eq 8
+	If ($is64BitProcess -eq $true) { $psArchitecture = "x64" }
+	Else { $psArchitecture = "x86" }
+	#endregion
+	
+	
+	#endregion
+	
+	#region - Execution
+	#-----------------------------------------------------------[Execution]------------------------------------------------------------
+	
+	
+	Write-InitialLogEntry # Writes intial info to log, see function for further info
+	
+	Main # Put all script programming into Main function
+	
+	#endregion
+	
+} # End of Main Program Try
+#endregion
+
+#region - Main Program Catch
+#---------------------------------------------------------[Main Program Catch]--------------------------------------------------------
+Catch # Start of Main Program Catch
+{
+	# Log error messages
+	$e = $_.Exception
+	$line = $_.InvocationInfo.ScriptLineNumber
+	$msg = $e.Message
+	Write-Log "Caught exception at line `"$line`" within the following error message: $msg"
+} # End of Main Program Catch
+#endregion
+
+#region - Main Program Finally
+#---------------------------------------------------------[Main Program Finally]--------------------------------------------------------
+Finally # Start of Main Program Catch
+{
+	Write-Log " "
+	Write-Log "---------------------------------"
+	Write-Log "Main Program End"
+	Write-Log " "
+	
+	$currentTime = (Get-Date -UFormat "%T")
+	Write-Log "=================================================================="
+	Write-Log "  Script Ended: `t $currentDate (D/M/Y) $currentTime (local)"
+	Write-Log "=================================================================="
+	Write-Log " "
+} # End of Main Program Finally
+#endregion
